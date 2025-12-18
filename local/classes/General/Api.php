@@ -101,54 +101,42 @@ final class Api
     public function execute($class, $method, $data = [])
     {
         try {
-            if (method_exists($class, $method)) {
-                if (method_exists($class, 'jwt_decode')) {
-                    $jwt_data = call_user_func($class.'::'.'jwt_decode');
-                    $data['JWT_DATA'] = $jwt_data;
-                }
-                
-                $this->data = array_merge($this->data, $data);
-
-                if (in_array(CacheTrait::class, \class_uses($class))) {
-                    $ttl = $class::$cache_ttl;
-                    $id = $class.'\\'.$method.'\\'.$this->cache_id;
-                    $className = mb_strtolower((new \ReflectionClass($class))->getShortName());
-                    if (!($return = call_user_func($class.'::'.'getCache', $ttl, $id, "legacy/$className"))) {
-                        $return = call_user_func($class.'::'.$method, $this->data);
-                        call_user_func($class.'::'.'createCache', $ttl, $id, $return, "legacy/$className");
-                        $result['cache_fresh'] = true;
-                    }
-                    $result['cache_used'] = true;
-                } else {
-                    $return = call_user_func($class.'::'.$method, $this->data);
-                }
-
-                $result['status'] = 'ok';
-                $result['errorCode'] = 0;
-                $result['errorMessage'] = '';
-                $result['result'] = $return;
-            } else {
-                throw new \Exception('Метод не найден.');
+            if (!method_exists($class, $method)) {
+                throw new \Exception('Метод не найден');
             }
+
+            if (method_exists($class, 'jwt_decode')) {
+                $data['JWT_DATA'] = call_user_func($class . '::jwt_decode');
+            }
+
+            $this->data = array_merge($this->data, $data);
+
+            if (in_array(CacheTrait::class, class_uses($class))) {
+                $ttl = $class::$cache_ttl;
+                $id = $class . '\\' . $method . '\\' . $this->cache_id;
+                $className = mb_strtolower((new \ReflectionClass($class))->getShortName());
+
+                if (!($return = call_user_func($class . '::getCache', $ttl, $id, "legacy/$className"))) {
+                    $return = call_user_func($class . '::' . $method, $this->data);
+                    call_user_func($class . '::createCache', $ttl, $id, $return, "legacy/$className");
+                }
+            } else {
+                $return = call_user_func($class . '::' . $method, $this->data);
+            }
+
+            return json_encode([
+                'status' => 'ok',
+                'result' => $return,
+            ], JSON_UNESCAPED_UNICODE);
+
         } catch (\Exception $e) {
-            $errorMessage = $e->getMessage();
+
             http_response_code(400);
-            $result['status'] = 'error';
-            $result['errorCode'] = 1;
 
-            $patternErrorType = '/(.*)\\[Тип ошибки: (.*). Значение типа ошибки: (.*).\\]/';
-            if (preg_match($patternErrorType, $errorMessage, $matches)){
-                $result['errorMessage'] = $matches[1];
-                $result['result'] = [
-                    'message' => $matches[1],
-                    $matches[2] => $matches[3],
-                ];
-            } else {
-                $result['errorMessage'] = $errorMessage;
-                $result['result'] = ['message' => $errorMessage];
-            }
+            return json_encode([
+                'status'       => 'error',
+                'errorMessage' => $e->getMessage(),
+            ], JSON_UNESCAPED_UNICODE);
         }
-
-        return json_encode($result, JSON_UNESCAPED_UNICODE);
     }
 }

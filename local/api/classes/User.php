@@ -17,13 +17,6 @@ class User
             'firstName'     => $arUser['NAME'] ?? '',
             'lastName'      => $arUser['LAST_NAME'] ?? '',
             'secondName'    => $arUser['SECOND_NAME'] ?? '',
-            'dateRegister'  => $arUser['DATE_REGISTER'] ?? '',
-            'lastLogin'     => $arUser['LAST_LOGIN'] ?? '',
-            'active'        => $arUser['ACTIVE'] ?? 'N',
-            'blocked'       => $arUser['UF_BLOCKED'] ?? 'N',
-            'isTeacher'     => in_array(Constants::GROUP_TEACHERS, $userGroups),
-            'isStudent'     => in_array(Constants::GROUP_STUDENTS, $userGroups),
-            'isAdmin'       => in_array(Constants::GROUP_ADMINS, $userGroups)
         ];
     }
 
@@ -41,7 +34,6 @@ class User
             $users[] = self::mapRow($arUser);
         }
 
-        // Получаем общее количество подходящих пользователей
         $rsTotal = CUser::GetList('ID', 'ASC', $filter);
         $total = $rsTotal->SelectedRowsCount();
 
@@ -52,21 +44,11 @@ class User
         ];
     }
 
-    // Получение текущего пользователя
-    // /api/User/getCurrent/
-    public static function getCurrent(): array
+    // Получение всех пользователей
+    // /api/User/get/
+    public static function get(array $arRequest = []): array
     {
-        global $USER;
-
-        if (!$USER->IsAuthorized()) {
-            return ['message' => 'User not authenticated'];
-        }
-
-        $userId = $USER->GetID();
-        $rsUser = CUser::GetByID($userId);
-        $arUser = $rsUser->Fetch();
-
-        return self::mapRow($arUser);
+        return self::getList($arRequest);
     }
 
     // Получение пользователя по ID
