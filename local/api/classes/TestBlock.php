@@ -3,7 +3,6 @@ namespace Legacy\API;
 
 use Bitrix\Main\Loader;
 use Bitrix\Main\Type\DateTime;
-use Bitrix\Main\Entity\ExpressionField;
 use Legacy\General\Constants;
 use Legacy\Iblock\TestBlockElementTable;
 
@@ -11,7 +10,28 @@ class TestBlock
 {
     private const IBLOCK_ID = Constants::IB_TESTBLOCK;
 
-    // Получение всего списка элементов
+    private static function formatDate(?DateTime $dt): ?string
+    {
+        return $dt instanceof DateTime ? $dt->toString() : null;
+    }
+
+    private static function mapRow(array $row): array
+    {
+        return [
+            'id'            => $row['ID'],
+            'code'          => $row['CODE'],
+            'title'         => $row['NAME'],
+            'active'        => $row['ACTIVE'] ?? null,
+            'active_from'   => self::formatDate($row['ACTIVE_FROM'] ?? null),
+            'active_to'     => self::formatDate($row['ACTIVE_TO'] ?? null),
+            'sort'          => $row['SORT'] ?? null,
+            'date_create'   => self::formatDate($row['DATE_CREATE'] ?? null),
+            'date_modify'   => self::formatDate($row['TIMESTAMP_X'] ?? null),
+            'test_property' => $row['PROPERTY_VALUE'] ?? null,
+        ];
+    }
+
+    // Получение списка элементов
     // /api/TestBlock/getElements/
     public static function getElements(array $arRequest = []): array
     {
@@ -26,6 +46,7 @@ class TestBlock
         TestBlockElementTable::withSelect($query);
         TestBlockElementTable::withRuntimeProperties($query);
 
+        // Добавляем каждое поле отдельно
         $query->addSelect('DATE_CREATE');
         $query->addSelect('TIMESTAMP_X');
         $query->addSelect('ACTIVE');
@@ -37,43 +58,20 @@ class TestBlock
         TestBlockElementTable::withPage($query, $limit, $page);
         $query->setOrder(['ID' => 'ASC']);
 
-        $db = $query->exec();
         $items = [];
-
+        $db = $query->exec();
         while ($row = $db->fetch()) {
-            $items[] = [
-                'id'            => $row['ID'],
-                'code'          => $row['CODE'],
-                'title'         => $row['NAME'],
-                'active'        => $row['ACTIVE'],
-                'active_from'   => $row['ACTIVE_FROM'] instanceof DateTime ? $row['ACTIVE_FROM']->toString() : null,
-                'active_to'     => $row['ACTIVE_TO'] instanceof DateTime ? $row['ACTIVE_TO']->toString() : null,
-                'sort'          => $row['SORT'],
-                'date_create'   => $row['DATE_CREATE'] instanceof DateTime ? $row['DATE_CREATE']->toString() : null,
-                'date_modify'   => $row['TIMESTAMP_X'] instanceof DateTime ? $row['TIMESTAMP_X']->toString() : null,
-                'test_property' => $row['PROPERTY_VALUE'] ?? null,
-            ];
+            $items[] = self::mapRow($row);
         }
 
-        $countQuery = TestBlockElementTable::query();
-        $countQuery->registerRuntimeField(
-            'CNT',
-            new ExpressionField('CNT', 'COUNT(%s)', ['ID'])
-        );
-        $countQuery->addFilter('IBLOCK_ID', self::IBLOCK_ID);
-        $countQuery->setSelect(['CNT']);
-        $countDb = $countQuery->exec();
-        $countRow = $countDb->fetch();
-        $totalCount = (int)($countRow['CNT'] ?? 0);
-
         return [
-            'count' => $totalCount,
+            'count' => count($items),
             'items' => $items
         ];
     }
 
     // Получение одного элемента по ID
-    // /api/TestBlock/getById/
+    // /api/TestBlock/getById/?id=
     public static function getById(array $arRequest): ?array
     {
         $id = (int)($arRequest['id'] ?? 0);
@@ -81,7 +79,7 @@ class TestBlock
             throw new \Exception('Не передан ID элемента');
         }
 
-        if (!\Bitrix\Main\Loader::includeModule('iblock')) {
+        if (!Loader::includeModule('iblock')) {
             throw new \Exception('Модуль iblock не загружен');
         }
 
@@ -89,7 +87,6 @@ class TestBlock
         TestBlockElementTable::withSelect($query);
         TestBlockElementTable::withRuntimeProperties($query);
 
-        // Подключаем реальные поля
         $query->addSelect('DATE_CREATE');
         $query->addSelect('TIMESTAMP_X');
         $query->addSelect('ACTIVE');
@@ -103,21 +100,6 @@ class TestBlock
         $db = $query->exec();
         $row = $db->fetch();
 
-        if (!$row) {
-            return null;
-        }
-
-        return [
-            'id'            => $row['ID'],
-            'code'          => $row['CODE'],
-            'title'         => $row['NAME'],
-            'active'        => $row['ACTIVE'],
-            'active_from'   => $row['ACTIVE_FROM'] instanceof DateTime ? $row['ACTIVE_FROM']->toString() : null,
-            'active_to'     => $row['ACTIVE_TO'] instanceof DateTime ? $row['ACTIVE_TO']->toString() : null,
-            'sort'          => $row['SORT'],
-            'date_create'   => $row['DATE_CREATE'] instanceof DateTime ? $row['DATE_CREATE']->toString() : null,
-            'date_modify'   => $row['TIMESTAMP_X'] instanceof DateTime ? $row['TIMESTAMP_X']->toString() : null,
-            'test_property' => $row['PROPERTY_VALUE'] ?? null,
-        ];
+        return $row ? self::mapRow($row) : null;
     }
 }
