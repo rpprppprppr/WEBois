@@ -3,17 +3,13 @@ namespace Legacy\API;
 
 use Bitrix\Main\Loader;
 use Bitrix\Main\Type\DateTime;
+
 use Legacy\General\Constants;
 use Legacy\Iblock\TestBlockElementTable;
 
 class TestBlock
 {
     private const IBLOCK_ID = Constants::IB_TESTBLOCK;
-
-    private static function formatDate(?DateTime $dt): ?string
-    {
-        return $dt instanceof DateTime ? $dt->toString() : null;
-    }
 
     private static function mapRow(array $row): array
     {
@@ -22,18 +18,18 @@ class TestBlock
             'code'          => $row['CODE'],
             'title'         => $row['NAME'],
             'active'        => $row['ACTIVE'] ?? null,
-            'active_from'   => self::formatDate($row['ACTIVE_FROM'] ?? null),
-            'active_to'     => self::formatDate($row['ACTIVE_TO'] ?? null),
-            'sort'          => $row['SORT'] ?? null,
-            'date_create'   => self::formatDate($row['DATE_CREATE'] ?? null),
-            'date_modify'   => self::formatDate($row['TIMESTAMP_X'] ?? null),
+            'active_from'   => $row['ACTIVE_FROM'] instanceof DateTime ? $row['ACTIVE_FROM']->toString() : null,
+            'active_to'     => $row['ACTIVE_TO'] instanceof DateTime ? $row['ACTIVE_TO']->toString() : null,
+            'date_create'   => $row['DATE_CREATE'] instanceof DateTime ? $row['DATE_CREATE']->toString() : null,
+            'date_modify'   => $row['TIMESTAMP_X'] instanceof DateTime ? $row['TIMESTAMP_X']->toString() : null,
             'test_property' => $row['PROPERTY_VALUE'] ?? null,
+            'sort'          => $row['SORT'] ?? null,
         ];
     }
 
     // Получение списка элементов
-    // /api/TestBlock/getElements/
-    public static function getElements(array $arRequest = []): array
+    // /api/TestBlock/get/
+    public static function get(array $arRequest = []): array
     {
         if (!Loader::includeModule('iblock')) {
             throw new \Exception('Модуль iblock не загружен');
@@ -45,14 +41,6 @@ class TestBlock
         $query = TestBlockElementTable::query();
         TestBlockElementTable::withSelect($query);
         TestBlockElementTable::withRuntimeProperties($query);
-
-        // Добавляем каждое поле отдельно
-        $query->addSelect('DATE_CREATE');
-        $query->addSelect('TIMESTAMP_X');
-        $query->addSelect('ACTIVE');
-        $query->addSelect('ACTIVE_FROM');
-        $query->addSelect('ACTIVE_TO');
-        $query->addSelect('SORT');
 
         $query->addFilter('IBLOCK_ID', self::IBLOCK_ID);
         TestBlockElementTable::withPage($query, $limit, $page);
@@ -87,15 +75,34 @@ class TestBlock
         TestBlockElementTable::withSelect($query);
         TestBlockElementTable::withRuntimeProperties($query);
 
-        $query->addSelect('DATE_CREATE');
-        $query->addSelect('TIMESTAMP_X');
-        $query->addSelect('ACTIVE');
-        $query->addSelect('ACTIVE_FROM');
-        $query->addSelect('ACTIVE_TO');
-        $query->addSelect('SORT');
-
         $query->addFilter('IBLOCK_ID', self::IBLOCK_ID);
         $query->addFilter('ID', $id);
+
+        $db = $query->exec();
+        $row = $db->fetch();
+
+        return $row ? self::mapRow($row) : null;
+    }
+
+    // Получение одного элемента по CODE
+    // /api/TestBlock/getByCode/?code=
+    public static function getByCode(array $arRequest): ?array
+    {
+        $code = (string)($arRequest['code'] ?? '');
+        if (!$code) {
+            throw new \Exception('Не передан CODE элемента');
+        }
+
+        if (!Loader::includeModule('iblock')) {
+            throw new \Exception('Модуль iblock не загружен');
+        }
+
+        $query = TestBlockElementTable::query();
+        TestBlockElementTable::withSelect($query);
+        TestBlockElementTable::withRuntimeProperties($query);
+
+        $query->addFilter('IBLOCK_ID', self::IBLOCK_ID);
+        $query->addFilter('CODE', $code);
 
         $db = $query->exec();
         $row = $db->fetch();

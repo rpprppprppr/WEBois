@@ -3,12 +3,10 @@
 namespace Legacy\Iblock;
 
 use Bitrix\Iblock\ElementTable;
-use Bitrix\Iblock\SectionTable;
 use Bitrix\Iblock\ElementPropertyTable;
 use Bitrix\Main\DB\SqlExpression;
 use Bitrix\Main\Entity\Query;
 use Bitrix\Main\Entity\ReferenceField;
-use Bitrix\Main\Entity\ExpressionField;
 use Legacy\General\Constants;
 
 class TestBlockElementTable extends ElementTable
@@ -19,7 +17,12 @@ class TestBlockElementTable extends ElementTable
             'ID',
             'NAME',
             'CODE',
-            'DATE_CREATE'
+            'ACTIVE',
+            'ACTIVE_FROM',
+            'ACTIVE_TO',
+            'DATE_CREATE',
+            'TIMESTAMP_X',
+            'SORT',
         ]);
     }
 
