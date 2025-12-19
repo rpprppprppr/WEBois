@@ -318,4 +318,41 @@ class Courses
 
         return self::getById(['id' => $courseId])[0];
     }
+
+    // Удаление курса
+    // /api/Courses/delete/?id=1
+    public static function delete(array $arData): bool
+    {
+        $courseId = (int)($arData['id'] ?? 0);
+        if (!$courseId) {
+            throw new \Exception('Не передан ID курса');
+        }
+
+        $userId = UserMapper::getCurrentUserId();
+        if (!$userId) throw new \Exception('Неавторизованный пользователь');
+
+        $userGroups = UserMapper::getCurrentUserGroups();
+        if (!in_array(Constants::GROUP_ADMINS, $userGroups) && !in_array(Constants::GROUP_TEACHERS, $userGroups)) {
+            throw new \Exception('Доступ запрещен: только админ или преподаватель');
+        }
+
+        $course = self::getById(['id' => $courseId])[0];
+
+        if (in_array(Constants::GROUP_TEACHERS, $userGroups) && $course['AUTHOR']['ID'] != $userId) {
+            throw new \Exception('Доступ запрещен: это не ваш курс');
+        }
+
+        if (!\CModule::IncludeModule('iblock')) {
+            throw new \Exception('Не удалось подключить модуль iblock');
+        }
+
+        $el = new \CIBlockElement();
+        $deleted = $el->Delete($courseId);
+
+        if (!$deleted) {
+            throw new \Exception('Не удалось удалить курс');
+        }
+
+        return true;
+    }
 }
