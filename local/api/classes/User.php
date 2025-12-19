@@ -6,6 +6,71 @@ use Legacy\General\Constants;
 
 class User
 {
+    private static function checkAdmin(): void
+    {
+        $userId = UserMapper::getCurrentUserId();
+        $groups = UserMapper::getCurrentUserGroups();
+        if (!in_array(Constants::GROUP_ADMINS, $groups)) {
+            throw new \Exception('Доступ запрещен: требуется роль администратора');
+        }
+    }
+
+    // Создание пользователя
+    // /api/User/add/?login=test&password=123123&email=test@mail.ru&group_id=5
+    public static function add(array $arData): array
+    {
+        self::checkAdmin();
+
+        $login = trim($arData['login'] ?? '');
+        $password = trim($arData['password'] ?? '');
+        $email = trim($arData['email'] ?? '');
+        $groupId = (int)($arData['group_id'] ?? 0);
+
+        if (!$login || !$password || !$email || !$groupId) {
+            throw new \Exception('Не переданы обязательные параметры: login, password, email, group_id');
+        }
+
+        $user = new CUser();
+        $userId = $user->Add([
+            'LOGIN' => $login,
+            'PASSWORD' => $password,
+            'CONFIRM_PASSWORD' => $password,
+            'EMAIL' => $email,
+            'GROUP_ID' => [$groupId],
+            'ACTIVE' => 'Y',
+        ]);
+
+        if (!$userId) {
+            throw new \Exception('Не удалось создать пользователя: ' . $user->LAST_ERROR);
+        }
+
+        return UserMapper::map(CUser::GetByID($userId)->Fetch(), true);
+    }
+
+    // Удаление пользователя
+    // /api/User/delete/?id=5
+    public static function delete(array $arData): bool
+    {
+        self::checkAdmin();
+
+        $userId = (int)($arData['id'] ?? 0);
+        if (!$userId) {
+            throw new \Exception('Не передан ID пользователя');
+        }
+
+        // Проверка, чтобы админ не удалил самого себя
+        if ($userId === UserMapper::getCurrentUserId()) {
+            throw new \Exception('Нельзя удалить самого себя');
+        }
+
+        $user = new CUser();
+        if (!$user->Delete($userId)) {
+            throw new \Exception('Не удалось удалить пользователя');
+        }
+
+        return true;
+    }
+
     private static function getList(array $arRequest = []): array
     {
         $filter = $arRequest['filter'] ?? [];
