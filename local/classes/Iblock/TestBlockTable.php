@@ -4,12 +4,14 @@ namespace Legacy\Iblock;
 
 use Bitrix\Iblock\ElementTable;
 use Bitrix\Iblock\ElementPropertyTable;
+
 use Bitrix\Main\DB\SqlExpression;
 use Bitrix\Main\Entity\Query;
 use Bitrix\Main\Entity\ReferenceField;
+
 use Legacy\General\Constants;
 
-class TestBlockElementTable extends ElementTable
+class TestBlockTable extends ElementTable
 {
     public static function withSelect(Query $query)
     {
@@ -35,7 +37,7 @@ class TestBlockElementTable extends ElementTable
                 ElementPropertyTable::class,
                 [
                     'ref.IBLOCK_ELEMENT_ID' => 'this.ID',
-                    'ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::TEST_PROPERTY)
+                    'ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::PROP_TEST)
                 ]
             )
         );

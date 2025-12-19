@@ -12,12 +12,12 @@ class Auth
         $userGroups = CUser::GetUserGroup($arUser['ID']);
 
         return [
-            'id'            => $arUser['ID'],
-            'login'         => $arUser['LOGIN'],
-            'email'         => $arUser['EMAIL'],
-            'firstName'     => $arUser['NAME'] ?? '',
-            'lastName'      => $arUser['LAST_NAME'] ?? '',
-            'secondName'    => $arUser['SECOND_NAME'] ?? '',
+            'ID'            => $arUser['ID'],
+            'LOGIN'         => $arUser['LOGIN'],
+            'EMAIL'         => $arUser['EMAIL'],
+            'FIRST_NAME'     => $arUser['NAME'] ?? '',
+            'LAST_NAME'      => $arUser['LAST_NAME'] ?? '',
+            'SECOND_NAME'    => $arUser['SECOND_NAME'] ?? '',
             'isTeacher'     => in_array(Constants::GROUP_TEACHERS, $userGroups),
             'isStudent'     => in_array(Constants::GROUP_STUDENTS, $userGroups),
             'isAdmin'       => in_array(Constants::GROUP_ADMINS, $userGroups)
@@ -34,11 +34,11 @@ class Auth
         $password = (string)($arRequest['password'] ?? '');
 
         if ($login === '' || $password === '') {
-            throw new \Exception('Login and password are required');
+            throw new \Exception('Требуется ввести логин и пароль');
         }
 
         if ($USER->Login($login, $password, 'Y') !== true) {
-            throw new \Exception('Invalid login or password');
+            throw new \Exception('Неверный логин или пароль');
         }
 
         $arUser = CUser::GetByID($USER->GetID())->Fetch();
@@ -67,7 +67,7 @@ class Auth
         global $USER;
 
         if (!$USER->IsAuthorized()) {
-            throw new \Exception('User not authorized');
+            throw new \Exception('Пользователь не авторизован');
         }
 
         $rsUser = CUser::GetByID($USER->GetID());

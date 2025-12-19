@@ -11,19 +11,19 @@ class User
         $userGroups = CUser::GetUserGroup($arUser['ID']);
 
         return [
-            'id'            => $arUser['ID'],
-            'login'         => $arUser['LOGIN'],
-            'email'         => $arUser['EMAIL'],
-            'firstName'     => $arUser['NAME'] ?? '',
-            'lastName'      => $arUser['LAST_NAME'] ?? '',
-            'secondName'    => $arUser['SECOND_NAME'] ?? '',
+            'ID'            => $arUser['ID'],
+            'LOGIN'         => $arUser['LOGIN'],
+            'EMAIL'         => $arUser['EMAIL'],
+            'FIRST_NAME'     => $arUser['NAME'] ?? '',
+            'LAST_NAME'      => $arUser['LAST_NAME'] ?? '',
+            'SECOND_NAME'    => $arUser['SECOND_NAME'] ?? '',
         ];
     }
 
     private static function getList(array $arRequest = []): array
     {
         $filter = $arRequest['filter'] ?? [];
-        $limit  = (int)($arRequest['limit'] ?? 50);
+        $limit  = (int)($arRequest['limit'] ?? 20);
         $page   = (int)($arRequest['page'] ?? 1);
 
         $navParams = ['nPageSize' => $limit, 'iNumPage' => $page];
@@ -63,7 +63,10 @@ class User
         $rsUser = CUser::GetByID($userId);
         $arUser = $rsUser->Fetch();
 
-        return $arUser ? self::mapRow($arUser) : null;
+        if (!$arUser) {
+            throw new \Exception('Пользователь с таким ID не найден');
+        }
+        return self::mapRow($arUser);
     }
 
     // Получение преподавателей

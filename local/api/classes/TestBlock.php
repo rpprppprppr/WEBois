@@ -5,25 +5,25 @@ use Bitrix\Main\Loader;
 use Bitrix\Main\Type\DateTime;
 
 use Legacy\General\Constants;
-use Legacy\Iblock\TestBlockElementTable;
+use Legacy\Iblock\TestBlockTable;
 
 class TestBlock
 {
-    private const IBLOCK_ID = Constants::IB_TESTBLOCK;
+    private const IBLOCK_ID = Constants::IB_TESTBLOCKS;
 
     private static function mapRow(array $row): array
     {
         return [
-            'id'            => $row['ID'],
-            'code'          => $row['CODE'],
-            'title'         => $row['NAME'],
-            'active'        => $row['ACTIVE'] ?? null,
-            'active_from'   => $row['ACTIVE_FROM'] instanceof DateTime ? $row['ACTIVE_FROM']->toString() : null,
-            'active_to'     => $row['ACTIVE_TO'] instanceof DateTime ? $row['ACTIVE_TO']->toString() : null,
-            'date_create'   => $row['DATE_CREATE'] instanceof DateTime ? $row['DATE_CREATE']->toString() : null,
-            'date_modify'   => $row['TIMESTAMP_X'] instanceof DateTime ? $row['TIMESTAMP_X']->toString() : null,
-            'test_property' => $row['PROPERTY_VALUE'] ?? null,
-            'sort'          => $row['SORT'] ?? null,
+            'ID'            => $row['ID'],
+            'CODE'          => $row['CODE'],
+            'NAME'         => $row['NAME'],
+            'ACTIVE'        => $row['ACTIVE'] ?? null,
+            'ACTIVE_FROM'   => $row['ACTIVE_FROM'] instanceof DateTime ? $row['ACTIVE_FROM']->toString() : null,
+            'ACTIVE_TO'     => $row['ACTIVE_TO'] instanceof DateTime ? $row['ACTIVE_TO']->toString() : null,
+            'DATE_CREATE'   => $row['DATE_CREATE'] instanceof DateTime ? $row['DATE_CREATE']->toString() : null,
+            'DATE_MODIFY'   => $row['TIMESTAMP_X'] instanceof DateTime ? $row['TIMESTAMP_X']->toString() : null,
+            'PROPERTY_VALUE' => $row['PROPERTY_VALUE'] ?? null,
+            'SORT'          => $row['SORT'] ?? null,
         ];
     }
 
@@ -38,12 +38,12 @@ class TestBlock
         $limit = (int)($arRequest['limit'] ?? 20);
         $page  = (int)($arRequest['page'] ?? 1);
 
-        $query = TestBlockElementTable::query();
-        TestBlockElementTable::withSelect($query);
-        TestBlockElementTable::withRuntimeProperties($query);
+        $query = TestBlockTable::query();
+        TestBlockTable::withSelect($query);
+        TestBlockTable::withRuntimeProperties($query);
 
         $query->addFilter('IBLOCK_ID', self::IBLOCK_ID);
-        TestBlockElementTable::withPage($query, $limit, $page);
+        TestBlockTable::withPage($query, $limit, $page);
         $query->setOrder(['ID' => 'ASC']);
 
         $items = [];
@@ -71,9 +71,9 @@ class TestBlock
             throw new \Exception('Модуль iblock не загружен');
         }
 
-        $query = TestBlockElementTable::query();
-        TestBlockElementTable::withSelect($query);
-        TestBlockElementTable::withRuntimeProperties($query);
+        $query = TestBlockTable::query();
+        TestBlockTable::withSelect($query);
+        TestBlockTable::withRuntimeProperties($query);
 
         $query->addFilter('IBLOCK_ID', self::IBLOCK_ID);
         $query->addFilter('ID', $id);
@@ -81,7 +81,10 @@ class TestBlock
         $db = $query->exec();
         $row = $db->fetch();
 
-        return $row ? self::mapRow($row) : null;
+        if (!$row) {
+            throw new \Exception('Тестовый блок с таким ID не найден');
+        }
+        return self::mapRow($row);
     }
 
     // Получение одного элемента по CODE
@@ -97,9 +100,9 @@ class TestBlock
             throw new \Exception('Модуль iblock не загружен');
         }
 
-        $query = TestBlockElementTable::query();
-        TestBlockElementTable::withSelect($query);
-        TestBlockElementTable::withRuntimeProperties($query);
+        $query = TestBlockTable::query();
+        TestBlockTable::withSelect($query);
+        TestBlockTable::withRuntimeProperties($query);
 
         $query->addFilter('IBLOCK_ID', self::IBLOCK_ID);
         $query->addFilter('CODE', $code);
@@ -107,6 +110,9 @@ class TestBlock
         $db = $query->exec();
         $row = $db->fetch();
 
-        return $row ? self::mapRow($row) : null;
+        if (!$row) {
+            throw new \Exception('Тестовый блок с таким CODE не найден');
+        }
+        return self::mapRow($row);
     }
 }
