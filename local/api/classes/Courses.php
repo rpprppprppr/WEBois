@@ -215,12 +215,10 @@ class Courses
 
         if (!Loader::includeModule('iblock')) throw new \Exception('Не удалось подключить модуль iblock');
 
-        // Получаем пользователя для автора
         $author = User::getById(['id' => $authorId]);
         if (!$author) throw new \Exception('Автор не найден');
 
-        // Проверка, что автор принадлежит группе преподавателей
-        $authorGroups = UserMapper::getCurrentUserGroups($author['ID'] ?? 0); // или создаём метод getUserGroups($id)
+        $authorGroups = UserMapper::getCurrentUserGroups($author['ID'] ?? 0);
         if (!in_array(Constants::GROUP_TEACHERS, $authorGroups)) {
             throw new \Exception('Нельзя указать автора, который не является преподавателем');
         }
@@ -239,5 +237,85 @@ class Courses
         $course = self::getById(['id' => $id])[0];
 
         return $course;
+    }
+
+    // Добавление студента в курс
+    // /api/Courses/addStudent/?course_id=1&student_id=2
+    public static function addStudent(array $arData): array
+    {
+        $courseId = (int)($arData['course_id'] ?? 0);
+        $studentId = (int)($arData['student_id'] ?? 0);
+        if (!$courseId || !$studentId) {
+            throw new \Exception('Не передан course_id или student_id');
+        }
+
+        $userId = UserMapper::getCurrentUserId();
+        $userGroups = UserMapper::getCurrentUserGroups();
+
+        if (!in_array(Constants::GROUP_ADMINS, $userGroups) && !in_array(Constants::GROUP_TEACHERS, $userGroups)) {
+            throw new \Exception('Доступ запрещен: только админ или преподаватель');
+        }
+
+        $course = self::getById(['id' => $courseId])[0];
+
+        if (in_array(Constants::GROUP_TEACHERS, $userGroups) && $course['AUTHOR']['ID'] != $userId) {
+            throw new \Exception('Доступ запрещен: это не ваш курс');
+        }
+
+        $student = User::getById(['id' => $studentId]);
+        if (!$student) throw new \Exception('Студент не найден');
+
+        $students = $course['STUDENTS'] ? array_column($course['STUDENTS'], 'ID') : [];
+
+        if (in_array($studentId, $students)) {
+            throw new \Exception('Студент уже добавлен в курс');
+        }
+
+        $students[] = $studentId;
+        \CIBlockElement::SetPropertyValuesEx($courseId, Constants::IB_COURSES, [
+            Constants::PROP_STUDENTS => $students
+        ]);
+
+        return self::getById(['id' => $courseId])[0];
+    }
+
+    // Удаление студента из курса
+    // /api/Courses/removeStudent/?course_id=1&student_id=2
+    public static function removeStudent(array $arData): array
+    {
+        $courseId = (int)($arData['course_id'] ?? 0);
+        $studentId = (int)($arData['student_id'] ?? 0);
+        if (!$courseId || !$studentId) {
+            throw new \Exception('Не передан course_id или student_id');
+        }
+
+        $userId = UserMapper::getCurrentUserId();
+        $userGroups = UserMapper::getCurrentUserGroups();
+
+        if (!in_array(Constants::GROUP_ADMINS, $userGroups) && !in_array(Constants::GROUP_TEACHERS, $userGroups)) {
+            throw new \Exception('Доступ запрещен: только админ или преподаватель');
+        }
+
+        $course = self::getById(['id' => $courseId])[0];
+
+        if (in_array(Constants::GROUP_TEACHERS, $userGroups) && $course['AUTHOR']['ID'] != $userId) {
+            throw new \Exception('Доступ запрещен: это не ваш курс');
+        }
+
+        $students = $course['STUDENTS'] ? array_column($course['STUDENTS'], 'ID') : [];
+
+        if (!in_array($studentId, $students)) {
+            throw new \Exception('Студента нет в курсе');
+        }
+
+        $students = array_values(array_filter($students, fn($id) => $id != $studentId));
+
+        \CIBlockElement::SetPropertyValuesEx(
+            $courseId,
+            Constants::IB_COURSES,
+            [Constants::PROP_STUDENTS => $students ?: false]
+        );
+
+        return self::getById(['id' => $courseId])[0];
     }
 }
