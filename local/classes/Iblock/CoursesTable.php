@@ -82,4 +82,47 @@ class CoursesTable extends ElementTable
         $query->setLimit($limit);
         $query->setOffset(($page - 1) * $limit);
     }
+
+    public static function addCourse(array $fields): int
+    {
+        if (!\CModule::IncludeModule('iblock')) {
+            throw new \Exception('Не удалось подключить модуль iblock');
+        }
+
+        $arFields = [
+            'IBLOCK_ID' => Constants::IB_COURSES,
+            'NAME' => $fields['NAME'] ?? '',
+            'CODE' => $fields['CODE'] ?? '',
+            'ACTIVE' => 'Y',
+        ];
+
+        $el = new \CIBlockElement();
+        $id = $el->Add($arFields);
+
+        if (!$id) {
+            throw new \Exception('Не удалось создать элемент курса: ' . $el->LAST_ERROR);
+        }
+
+        if (!empty($fields['PROP_AUTHOR']['ID'])) {
+            \CIBlockElement::SetPropertyValuesEx(
+                $id,
+                Constants::IB_COURSES,
+                [Constants::PROP_AUTHOR => $fields['PROP_AUTHOR']['ID']]
+            );
+        }
+
+        if (!empty($fields['DESCRIPTION'])) {
+            \CIBlockElement::SetPropertyValuesEx($id, Constants::IB_COURSES, [
+                Constants::PROP_DESCRIPTION => $fields['DESCRIPTION']
+            ]);
+        }
+
+        if (!empty($fields['STUDENT_ID'])) {
+            \CIBlockElement::SetPropertyValuesEx($id, Constants::IB_COURSES, [
+                Constants::PROP_STUDENTS => $fields['STUDENT_ID']
+            ]);
+        }
+
+        return (int)$id;
+    }
 }

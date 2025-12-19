@@ -44,4 +44,9 @@ class UserMapper
         global $USER;
         return $USER->GetUserGroupArray();
     }
+
+    public static function getUserGroups(int $userId): array
+    {
+        return CUser::GetUserGroup($userId);
+    }
 }

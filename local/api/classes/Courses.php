@@ -186,4 +186,58 @@ class Courses
 
         return $result;
     }
+
+    // Добавление курса
+    // /api/Courses/add/?name=1&description=1&code=1
+    public static function add(array $arData): array
+    {
+        $userId = UserMapper::getCurrentUserId();
+        if (!$userId) throw new \Exception('Неавторизованный пользователь');
+
+        $userGroups = UserMapper::getCurrentUserGroups();
+        if (!in_array(Constants::GROUP_ADMINS, $userGroups) && !in_array(Constants::GROUP_TEACHERS, $userGroups)) {
+            throw new \Exception('Доступ запрещен: только админ или преподаватель');
+        }
+
+        $name = trim($arData['name'] ?? '');
+        $description = $arData['description'] ?? '';
+        $code = trim($arData['code'] ?? '');
+
+        if ($name === '' || $description === '' || $code === '') {
+            throw new \Exception('Обязательные поля: NAME, DESCRIPTION, CODE');
+        }
+
+        if (in_array(Constants::GROUP_TEACHERS, $userGroups)) {
+            $authorId = $userId;
+        } elseif (in_array(Constants::GROUP_ADMINS, $userGroups)) {
+            $authorId = (int)($arData['author_id'] ?? $userId);
+        }
+
+        if (!Loader::includeModule('iblock')) throw new \Exception('Не удалось подключить модуль iblock');
+
+        // Получаем пользователя для автора
+        $author = User::getById(['id' => $authorId]);
+        if (!$author) throw new \Exception('Автор не найден');
+
+        // Проверка, что автор принадлежит группе преподавателей
+        $authorGroups = UserMapper::getCurrentUserGroups($author['ID'] ?? 0); // или создаём метод getUserGroups($id)
+        if (!in_array(Constants::GROUP_TEACHERS, $authorGroups)) {
+            throw new \Exception('Нельзя указать автора, который не является преподавателем');
+        }
+
+        $fields = [
+            'NAME' => $name,
+            'DESCRIPTION' => self::mapDescription($description),
+            'CODE' => $code,
+            'PROP_AUTHOR' => $author,
+            'STUDENT_ID' => [],
+        ];
+
+        $id = CoursesTable::addCourse($fields);
+        if (!$id) throw new \Exception('Не удалось создать курс');
+
+        $course = self::getById(['id' => $id])[0];
+
+        return $course;
+    }
 }
