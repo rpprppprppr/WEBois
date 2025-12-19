@@ -31,7 +31,13 @@ class Auth
     public static function logout(): array
     {
         global $USER;
+
+        if (!$USER->IsAuthorized()) {
+            throw new \Exception('Пользователь не авторизован');
+        }
+
         $USER->Logout();
+
         return ['success' => true];
     }
 
