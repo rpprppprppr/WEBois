@@ -219,7 +219,7 @@ class Modules
 
         $role = self::getUserRole();
         if (!in_array($role, ['admin', 'teacher'])) {
-            throw new \Exception('Доступ запрещен');
+            throw new \Exception('Доступ запрещен: студенты не могут добавлять модули');
         }
 
         $required = ['name', 'type', 'max_score', 'deadline', 'course_id'];
@@ -232,7 +232,7 @@ class Modules
         $fields = [
             'NAME' => $arData['name'],
             'DESCRIPTION' => $arData['description'] ?? '',
-            'TYPE' => self::resolveModuleType($arData['type']), // ✅
+            'TYPE' => self::resolveModuleType($arData['type']),
             'MAX_SCORE' => (int)$arData['max_score'],
             'DEADLINE' => $arData['deadline'],
             'COURSE_ID' => (int)$arData['course_id'],
@@ -271,7 +271,7 @@ class Modules
 
         $role = self::getUserRole();
         if (!in_array($role, ['admin', 'teacher'])) {
-            throw new \Exception('Доступ запрещен');
+            throw new \Exception('Доступ запрещен: студенты не могут обновлять модули');
         }
 
         if ($role === 'teacher') {
@@ -291,7 +291,7 @@ class Modules
             $fields['DESCRIPTION'] = $arData['description'];
         }
         if (array_key_exists('type', $arData)) {
-            $fields['TYPE'] = self::resolveModuleType($arData['type']); // ✅
+            $fields['TYPE'] = self::resolveModuleType($arData['type']);
         }
         if (array_key_exists('max_score', $arData)) {
             $fields['MAX_SCORE'] = (int)$arData['max_score'];
@@ -317,7 +317,7 @@ class Modules
 
         $userId = UserMapper::getCurrentUserId();
         $role = self::getUserRole();
-        if (!in_array($role, ['admin', 'teacher'])) throw new \Exception('Доступ запрещен');
+        if (!in_array($role, ['admin', 'teacher'])) throw new \Exception('Доступ запрещен: студенты не могут удалять модули');
 
         if ($role === 'teacher') {
             $module = ModulesTable::getModuleById($moduleId);
