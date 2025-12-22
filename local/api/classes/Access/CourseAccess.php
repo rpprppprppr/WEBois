@@ -13,17 +13,7 @@ class CourseAccess
         $result = Courses::getRawById($courseId);
         $course = $result['course'];
 
-        $studentIds = [];
-        if (!empty($course['STUDENT_ID'])) {
-            if (isset($course['STUDENT_ID']['VALUE']) && is_array($course['STUDENT_ID']['VALUE'])) {
-                $studentIds = $course['STUDENT_ID']['VALUE'];
-            } elseif (is_array($course['STUDENT_ID'])) {
-                $studentIds = $course['STUDENT_ID'];
-            } elseif (is_string($course['STUDENT_ID'])) {
-                $studentIds = array_filter(explode(',', $course['STUDENT_ID']));
-            }
-            $studentIds = array_map('intval', $studentIds);
-        }
+        $studentIds = Courses::parseStudentIds($course['STUDENT_ID'] ?? '');
 
         $fullInfo = match ($role) {
             'admin'   => true,

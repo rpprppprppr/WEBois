@@ -28,18 +28,22 @@ class Courses
             : null;
 
         $students = [];
-        if (!empty($row['STUDENT_ID'])) {
-            foreach ((array)$row['STUDENT_ID'] as $id) {
-                if ($user = UserAccess::getUserById((int)$id)) {
-                    $students[] = $user;
-                }
+        $studentIds = self::parseStudentIds($row['STUDENT_ID'] ?? '');
+        foreach ($studentIds as $id) {
+            if ($user = UserAccess::getUserById((int)$id)) {
+                $students[] = $user;
             }
         }
 
         $modules = [];
         if ($withModules) {
-            $modulesData = Modules::getByCourse(['course_id' => $row['ID']]);
-            $modules = $modulesData['items'] ?? [];
+            $moduleIds = self::parseStudentIds($row['MODULE_ID'] ?? '');
+            foreach ($moduleIds as $mid) {
+                $module = Modules::getById($mid);
+                if ($module) {
+                    $modules[] = $module;
+                }
+            }
         }
 
         return Mappers::mapCourse([
@@ -89,9 +93,46 @@ class Courses
         };
 
         $result = self::getList($arRequest, $filter);
-        $result['items'] = array_map(fn($row) => self::mapCourseRow($row), $result['items']);
+
+        $groupedItems = [];
+        foreach ($result['items'] as $row) {
+            $courseId = $row['ID'];
+            if (!isset($groupedItems[$courseId])) {
+                $groupedItems[$courseId] = $row;
+            } else {
+                $existingStudents = self::parseStudentIds($groupedItems[$courseId]['STUDENT_ID']);
+                $newStudents = self::parseStudentIds($row['STUDENT_ID']);
+
+                $allStudents = array_unique(array_merge($existingStudents, $newStudents));
+                $groupedItems[$courseId]['STUDENT_ID'] = implode(',', $allStudents);
+            }
+        }
+
+        $result['items'] = array_map(fn($row) => self::mapCourseRow($row), array_values($groupedItems));
+        $result['count'] = count($result['items']);
 
         return $result;
+    }
+
+    public static function parseStudentIds($studentData): array
+    {
+        if (empty($studentData)) {
+            return [];
+        }
+
+        if (is_string($studentData)) {
+            return array_filter(array_map('intval', explode(',', $studentData)), fn($id) => $id > 0);
+        }
+
+        if (is_array($studentData)) {
+            return array_filter(array_map('intval', $studentData), fn($id) => $id > 0);
+        }
+
+        if (is_numeric($studentData)) {
+            return [(int)$studentData];
+        }
+
+        return [];
     }
 
     // Получение курсов по ID
@@ -200,17 +241,7 @@ class Courses
 
         $course = CourseAccess::getCourseForManage($courseId);
 
-        $students = [];
-        if (!empty($course['STUDENT_ID'])) {
-            if (isset($course['STUDENT_ID']['VALUE']) && is_array($course['STUDENT_ID']['VALUE'])) {
-                $students = $course['STUDENT_ID']['VALUE'];
-            } elseif (is_array($course['STUDENT_ID'])) {
-                $students = $course['STUDENT_ID'];
-            } elseif (is_string($course['STUDENT_ID'])) {
-                $students = array_filter(explode(',', $course['STUDENT_ID']));
-            }
-            $students = array_map('intval', $students);
-        }
+        $students = self::parseStudentIds($course['STUDENT_ID'] ?? '');
 
         if ($action === 'add') {
             if (in_array($studentId, $students, true)) {
@@ -219,19 +250,23 @@ class Courses
             $students[] = $studentId;
             $message = 'Студент успешно добавлен в курс';
         } elseif ($action === 'remove') {
-            if (!in_array($studentId, $students, true)) {
+            $key = array_search($studentId, $students, true);
+            if ($key === false) {
                 throw new \Exception('Студента нет в курсе');
             }
-            $students = array_values(array_filter($students, fn($id) => $id != $studentId));
+            unset($students[$key]);
+            $students = array_values($students);
             $message = 'Студент успешно удален из курса';
         } else {
             throw new \Exception('Неверное действие');
         }
 
+        $propertyValue = !empty($students) ? $students : false;
+
         \CIBlockElement::SetPropertyValuesEx(
             $courseId,
             Constants::IB_COURSES,
-            [Constants::COURSE_STUDENTS => $students ?: false]
+            [Constants::COURSE_STUDENTS => $propertyValue]
         );
 
         return ['success' => true, 'message' => $message];

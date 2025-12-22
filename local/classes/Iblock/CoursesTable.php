@@ -34,8 +34,8 @@ class CoursesTable extends ElementTable
                 'DESCRIPTION_PROP',
                 ElementPropertyTable::class,
                 [
-                    'ref.IBLOCK_ELEMENT_ID' => 'this.ID',
-                    'ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::COURSE_DESCRIPTION)
+                    '=ref.IBLOCK_ELEMENT_ID' => 'this.ID',
+                    '=ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::COURSE_DESCRIPTION)
                 ]
             )
         );
@@ -47,8 +47,8 @@ class CoursesTable extends ElementTable
                 'AUTHOR_PROP',
                 ElementPropertyTable::class,
                 [
-                    'ref.IBLOCK_ELEMENT_ID' => 'this.ID',
-                    'ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::COURSE_AUTHOR)
+                    '=ref.IBLOCK_ELEMENT_ID' => 'this.ID',
+                    '=ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::COURSE_AUTHOR)
                 ]
             )
         );
@@ -60,12 +60,27 @@ class CoursesTable extends ElementTable
                 'STUDENTS_PROP',
                 ElementPropertyTable::class,
                 [
-                    'ref.IBLOCK_ELEMENT_ID' => 'this.ID',
-                    'ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::COURSE_STUDENTS)
-                ]
+                    '=ref.IBLOCK_ELEMENT_ID' => 'this.ID',
+                    '=ref.IBLOCK_PROPERTY_ID' => new SqlExpression('?', Constants::COURSE_STUDENTS)
+                ],
+                ['join_type' => 'LEFT']
             )
         );
-        $query->addSelect('STUDENTS_PROP.VALUE', 'STUDENT_ID');
+
+        $query->addGroup('ID');
+        $query->addGroup('NAME');
+        $query->addGroup('DESCRIPTION_PROP.VALUE');
+        $query->addGroup('AUTHOR_PROP.VALUE');
+
+        $query->registerRuntimeField(
+            'STUDENT_IDS',
+            new \Bitrix\Main\Entity\ExpressionField(
+                'STUDENT_IDS',
+                'GROUP_CONCAT(DISTINCT %s SEPARATOR ",")',
+                ['STUDENTS_PROP.VALUE']
+            )
+        );
+        $query->addSelect('STUDENT_IDS', 'STUDENT_ID');
     }
 
     public static function withFilter(Query $query, array $filter = []): void
