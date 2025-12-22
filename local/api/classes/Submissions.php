@@ -5,8 +5,6 @@ use Legacy\API\Access\UserAccess;
 use Legacy\API\Access\SubmissionsAccess;
 
 use Legacy\HighLoadBlock\SubmissionsTable;
-
-use Legacy\Iblock\CoursesTable;
 use Legacy\Iblock\ModulesTable;
 
 use Bitrix\Main\Type\DateTime;
@@ -17,17 +15,19 @@ class Submissions
     {
         $fileIds = [];
         if (!empty($row['UF_FILE'])) {
-            if (is_array($row['UF_FILE'])) {
-                $fileIds = array_map('intval', $row['UF_FILE']);
-            } else {
-                $fileIds[] = (int)$row['UF_FILE'];
-            }
+            $fileIds = is_array($row['UF_FILE'])
+                ? array_map('intval', $row['UF_FILE'])
+                : [(int)$row['UF_FILE']];
         }
 
         return Mappers::mapSubmission([
             'ID' => $row['ID'],
-            'STUDENT' => !empty($row['UF_STUDENT_ID']) ? UserAccess::getUserById((int)$row['UF_STUDENT_ID']) : null,
-            'MODULE' => !empty($row['UF_MODULE']) ? ModulesTable::getModuleById((int)$row['UF_MODULE']) : null,
+            'STUDENT' => !empty($row['UF_STUDENT_ID'])
+                ? UserAccess::getUserById((int)$row['UF_STUDENT_ID'])
+                : null,
+            'MODULE' => !empty($row['UF_MODULE'])
+                ? ModulesTable::getModuleById((int)$row['UF_MODULE'])
+                : null,
             'UF_SCORE' => $row['UF_SCORE'] ?? null,
             'UF_STATUS' => $row['UF_STATUS'] ?? null,
             'UF_ANSWER' => $row['UF_ANSWER'] ?? null,
@@ -47,24 +47,17 @@ class Submissions
 
         $filter = [];
 
-        // фильтр по модулю из запроса
         if (!empty($arRequest['module_id'])) {
             $filter['UF_MODULE'] = (int)$arRequest['module_id'];
         }
 
-        // студент — только свои работы
         if ($role === 'student') {
             $filter['UF_STUDENT_ID'] = $userId;
         }
 
-        // преподаватель — только свои модули
         if ($role === 'teacher') {
             $allowedModules = SubmissionsAccess::getAllowedModuleIds();
-
-            if (empty($allowedModules)) {
-                return ['count' => 0, 'items' => []];
-            }
-
+            if (empty($allowedModules)) return ['count' => 0, 'items' => []];
             $filter['UF_MODULE'] = $allowedModules;
         }
 
@@ -90,9 +83,7 @@ class Submissions
     // /api/Submissions/getById/?submission_id=
     public static function getById(array $arRequest): ?array
     {
-        $userId = UserAccess::checkAuth();
         $id = SubmissionsAccess::requireSubmissionId($arRequest);
-
         $row = SubmissionsTable::getRow(['filter' => ['ID' => $id]]);
         if (!$row) throw new \Exception('Submission не найден');
 
@@ -110,19 +101,23 @@ class Submissions
         $moduleId = (int)($arData['module_id'] ?? 0);
         $answer = trim($arData['answer'] ?? '');
         $link = trim($arData['link'] ?? '');
-        if (!$moduleId || !$answer) {
-            throw new \Exception('Не указан module_id или answer');
-        }
+
+        if (!$moduleId || !$answer) throw new \Exception('Не указан module_id или answer');
 
         SubmissionsAccess::assertModuleStudentAccess($moduleId, $userId);
 
         $module = ModulesTable::getModuleById($moduleId);
-        if (!$module) {
-            throw new \Exception('Модуль не найден');
+        if (!$module) throw new \Exception('Модуль не найден');
+        if (mb_strtolower($module['TYPE'] ?? '') === 'lesson') {
+            throw new \Exception('Невозможно сдать модуль: тип модуля "Урок"');
         }
 
-        if (mb_strtolower($module['TYPE'] ?? '') == 'Урок') {
-            throw new \Exception('Невозможно сдать модуль: тип модуля "Урок');
+        if (!empty($module['UF_DEADLINE'])) {
+            $now = new DateTime();
+            $deadline = new DateTime($module['UF_DEADLINE']);
+            if ($now > $deadline) {
+                throw new \Exception('Сдать работу невозможно: срок сдачи истек');
+            }
         }
 
         $fields = [
@@ -131,7 +126,7 @@ class Submissions
             'UF_ANSWER' => $answer,
             'UF_LINK' => $link ?: $answer,
             'UF_DATE_SUBMITTED' => new DateTime(),
-            'UF_STATUS' => 1
+            'UF_STATUS' => 1,
         ];
 
         $submissionId = SubmissionsTable::add($fields);
@@ -139,7 +134,7 @@ class Submissions
         return [
             'success' => true,
             'ID' => $submissionId,
-            'message' => 'Работа успешно сдана'
+            'message' => 'Работа успешно сдана',
         ];
     }
 
@@ -147,35 +142,22 @@ class Submissions
     // /api/Submissions/review/
     public static function review(array $arData): array
     {
-        SubmissionsAccess::assertTeacherOrAdmin();
+        $userId = SubmissionsAccess::assertTeacherOrAdmin();
         $id = SubmissionsAccess::requireSubmissionId($arData);
+
         $row = SubmissionsTable::getRow(['filter' => ['ID' => $id]]);
-        if (!$row) {
-            throw new \Exception('Submission не найден');
-        }
+        if (!$row) throw new \Exception('Submission не найден');
+
+        SubmissionsAccess::checkSubmissionOwnership($row);
 
         $module = ModulesTable::getModuleById((int)$row['UF_MODULE']);
         if (!$module) throw new \Exception('Модуль не найден');
 
-        $course = CoursesTable::getCourseById((int)$module['COURSE_ID']);
-        if (!$course) throw new \Exception('Курс не найден');
-
-        $userId = UserAccess::getCurrentUserId();
-        $role = UserAccess::getUserRole();
-
-        if ($role === 'teacher' && (int)$course['AUTHOR_ID'] !== $userId) {
-            throw new \Exception('Доступ запрещен: это не ваш курс');
-        }
-
-        if (($row['UF_STATUS'] ?? '') == 2) {
-            throw new \Exception('Невозможно оценить работу: статус "Оценен"');
-        }
-
-        if (!empty($row['UF_SCORE'])) {
-            throw new \Exception('Невозможно оценить работу: оценка уже выставлена');
-        }
-
         $maxScore = (int)($module['MAX_SCORE'] ?? 0);
+
+        if (($row['UF_STATUS'] ?? 0) == 2) throw new \Exception('Невозможно оценить работу: статус "Оценен"');
+        if (!empty($row['UF_SCORE'])) throw new \Exception('Невозможно оценить работу: оценка уже выставлена');
+
         $fields = [];
 
         if (isset($arData['score'])) {
